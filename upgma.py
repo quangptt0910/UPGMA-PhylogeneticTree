@@ -17,7 +17,6 @@ class UPGMATreeBuilder:
         np.fill_diagonal(D, 0)
 
         next_id = 0  # For internal node naming
-        cluster_history = [] # track merge history
 
         while n > 1:
             # Find the closest clusters
@@ -34,24 +33,24 @@ class UPGMATreeBuilder:
             branch_i = new_height - heights[min_i]
             branch_j = new_height - heights[min_j]
 
-            # Create new clade
-            new_clade = BaseTree.Clade(name=f"N{next_id}")
+            # Create new cluster
+            new_size = sizes[min_i] + sizes[min_j]
+            new_clade = BaseTree.Clade()
+            new_clade.name = f"N{next_id}"  # Name internal node
             next_id += 1
 
-            # Create new children with branch lengths
-            left_child = BaseTree.Clade()
-            left_child.branch_i = branch_i
-            left_child.clades = [clusters[min_i]] if not clusters[min_i].clades else clusters[min_i].clades
+            # Get the clusters to merge and set their branch lengths
+            left_child = clusters[min_i]
+            right_child = clusters[min_j]
 
-            right_child = BaseTree.Clade()
-            right_child.branch_i = branch_i
-            right_child.clades = [clusters[min_i]] if not clusters[min_i].clades else clusters[min_i].clades
+            # Set branch lengths - this is the key fix
+            left_child.branch_length = branch_i
+            right_child.branch_length = branch_j
 
+            # Set children for new clade
             new_clade.clades = [left_child, right_child]
-            cluster_history.append(new_clade)
 
             # Update distance matrix
-            new_size = sizes[min_i]
             new_dists = []
             for k in range(n):
                 if k != min_i and k != min_j:
@@ -144,66 +143,6 @@ def test_upgma():
             print(f"{clade.name or 'Root'}: {clade.branch_length:.6f}")
 
     return tree
-
-
-def score_to_distance_matrix(score_matrix, method='max_score_normalize'):
-    """
-    Convert alignment score matrix to distance matrix for UPGMA
-
-    Args:
-        score_matrix: Matrix of pairwise alignment scores
-        method: Method for conversion ('max_score_normalize', 'percent_identity', 'negative_log')
-
-    Returns:
-        Distance matrix suitable for UPGMA
-    """
-    n = score_matrix.shape[0]
-    dist_matrix = np.zeros((n, n))
-
-    if method == 'max_score_normalize':
-        # Method 1: Normalize by maximum possible score
-        # Distance = (max_score - actual_score) / max_score
-        max_score = np.max(score_matrix)
-        for i in range(n):
-            for j in range(n):
-                if i != j:
-                    # Convert score to distance: higher score = lower distance
-                    dist_matrix[i][j] = (max_score - score_matrix[i][j]) / max_score
-                    # Ensure non-negative distances
-                    dist_matrix[i][j] = max(0, dist_matrix[i][j])
-
-    elif method == 'percent_identity':
-        # Method 2: Use percent identity approach
-        # Assumes diagonal contains self-alignment scores
-        diagonal_scores = np.diag(score_matrix)
-        for i in range(n):
-            for j in range(n):
-                if i != j:
-                    # Calculate percent identity relative to self-scores
-                    max_possible = (diagonal_scores[i] + diagonal_scores[j]) / 2
-                    if max_possible > 0:
-                        identity = score_matrix[i][j] / max_possible
-                        dist_matrix[i][j] = max(0, 1 - identity)
-                    else:
-                        dist_matrix[i][j] = 1.0
-
-    elif method == 'simple_inverse':
-        # Method 3: Simple inverse transformation
-        # Convert positive scores to small distances, negative scores to large distances
-        max_score = np.max(score_matrix)
-        min_score = np.min(score_matrix)
-        score_range = max_score - min_score
-
-        for i in range(n):
-            for j in range(n):
-                if i != j:
-                    # Normalize score to 0-1, then invert
-                    normalized_score = (score_matrix[i][j] - min_score) / score_range
-                    dist_matrix[i][j] = 1 - normalized_score
-
-    # Ensure diagonal is zero
-    np.fill_diagonal(dist_matrix, 0)
-    return dist_matrix
 
 
 if __name__ == "__main__":

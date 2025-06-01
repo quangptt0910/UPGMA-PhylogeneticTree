@@ -372,12 +372,17 @@ def print_msa(msa, seq_names=None):
         print()
 
 
-def compute_identity_matrix(msa):
+def compute_identity_matrix(msa, method='all_positions'):
     """
     Compute the percentage identity matrix from an MSA
 
     Args:
         msa (list): List of aligned sequences
+        method (str): Method for computing identity
+            - 'all_positions': Include all positions (gaps count as mismatches)
+            - 'no_gaps': Only count positions where neither sequence has a gap
+            - 'one_gap': Count positions where at most one sequence has a gap
+            - 'normalized': Normalize by shorter sequence length
 
     Returns:
         np.array: Matrix of percent identities between sequences
@@ -387,20 +392,50 @@ def compute_identity_matrix(msa):
 
     for i in range(n):
         for j in range(i, n):
-            # Count matches and total non-gap positions
-            matches = 0
-            total = 0
+            if i == j:
+                identity_matrix[i, j] = 1.0  # 100% identity with itself
+                continue
 
-            for k in range(len(msa[0])):
-                if msa[i][k] != '-' and msa[j][k] != '-':  # Neither is a gap
-                    total += 1
-                    if msa[i][k] == msa[j][k]:  # Match
-                        matches += 1
+            if method == 'all_positions':
+                # Count all positions, treat gaps as mismatches
+                matches = sum(1 for k in range(len(msa[0])) if msa[i][k] == msa[j][k])
+                total = len(msa[0])
+
+            elif method == 'no_gaps':
+                # Only count positions where neither sequence has a gap
+                matches = 0
+                total = 0
+                for k in range(len(msa[0])):
+                    if msa[i][k] != '-' and msa[j][k] != '-':
+                        total += 1
+                        if msa[i][k] == msa[j][k]:
+                            matches += 1
+
+            elif method == 'one_gap':
+                # Count positions where at most one sequence has a gap
+                matches = 0
+                total = 0
+                for k in range(len(msa[0])):
+                    if not (msa[i][k] == '-' and msa[j][k] == '-'):  # Not both gaps
+                        total += 1
+                        if msa[i][k] == msa[j][k]:
+                            matches += 1
+
+            elif method == 'normalized':
+                # Normalize by the length of the shorter original sequence
+                seq_i_len = sum(1 for c in msa[i] if c != '-')
+                seq_j_len = sum(1 for c in msa[j] if c != '-')
+                min_len = min(seq_i_len, seq_j_len)
+
+                matches = sum(1 for k in range(len(msa[0]))
+                              if msa[i][k] == msa[j][k] and msa[i][k] != '-')
+                total = min_len
 
             identity = matches / total if total > 0 else 0
             identity_matrix[i, j] = identity
             identity_matrix[j, i] = identity
 
+    print(f"Identity matrix (method: {method}):\n{identity_matrix}")
     return identity_matrix
 
 

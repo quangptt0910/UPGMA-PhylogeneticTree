@@ -2,7 +2,6 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from Bio import Phylo
 from msa import *
 from upgma import *
 
@@ -17,6 +16,7 @@ class UPGMA_GUI:
         input_frame = ttk.Frame(root)
         input_frame.pack(fill=tk.X, padx=10, pady=5)
 
+        # 2 Input method option
         ttk.Label(input_frame, text="Input Method:").grid(row=0, column=0, padx=5)
         ttk.Radiobutton(input_frame, text="Sequences", variable=self.input_method, value=0,
                         command=self.toggle_input).grid(row=0, column=1)
@@ -97,11 +97,37 @@ class UPGMA_GUI:
 
     def toggle_input(self):
         if self.input_method.get() == 0:
+            # Save matrix state before switching
+            if hasattr(self, 'matrix_entries'):
+                self.saved_matrix_state = (
+                    self.matrix_labels.get(),
+                    [[e.get() for e in row] for row in self.matrix_entries]
+                )
             self.matrix_frame.pack_forget()
             self.seq_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         else:
+            # Save sequence state before switching
+            self.saved_sequence_state = self.seq_text.get("1.0", tk.END)
             self.seq_frame.pack_forget()
             self.matrix_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+
+            # Restore matrix state if available
+            if hasattr(self, 'saved_matrix_state'):
+                labels, matrix_data = self.saved_matrix_state
+                self.matrix_labels.delete(0, tk.END)
+                self.matrix_labels.insert(0, labels)
+
+                size = len(matrix_data)
+                self.init_matrix_table(size)
+
+                # Fill matrix values
+                for i in range(size):
+                    for j in range(size):
+                        if i != j and j >= i:
+                            self.matrix_entries[i][j].delete(0, tk.END)
+                            self.matrix_entries[i][j].insert(0, matrix_data[i][j])
+                            self.matrix_entries[j][i].delete(0, tk.END)
+                            self.matrix_entries[j][i].insert(0, matrix_data[i][j])
 
     def clear_sequences(self):
         self.seq_text.delete("1.0", tk.END)
@@ -269,7 +295,11 @@ class UPGMA_GUI:
                 return
 
             # Compute identity matrix
-            dist_matrix = score_to_distance_matrix(score_matrix, method='simple_inverse')
+            identity_matrix = compute_identity_matrix(msa)
+            dist_matrix = 1 - identity_matrix
+
+            np.fill_diagonal(dist_matrix, 0)
+            dist_matrix = np.maximum(dist_matrix, 0)
 
         else:  # Distance matrix+
             dist_matrix, labels = self.parse_matrix()
@@ -304,32 +334,24 @@ class UPGMA_GUI:
             branch_labels=lambda c: f"{c.branch_length:.4f}"
                 if c.branch_length is not None
                    and c.branch_length > 0
+                    and not c.is_terminal()
                 else "",
             label_func=lambda c: c.name if c.name else "",
             do_show=False
         )
 
-        # Adjust layout to prevent cropping
         try:
-            # Get all terminal nodes to calculate max label width
-            terminal_nodes = tree.get_terminals()
-            if terminal_nodes:
-                max_label_length = max(len(str(clade.name)) for clade in terminal_nodes)
+            # Calc padding
+            max_label_len = max(len(str(clade.name)) for clade in tree.get_terminals())
+            padding = max_label_len * 0.015
 
-                # Calculate padding based on label length
-                padding = max_label_length * 0.02  # Adjust based on font size
-
-                # Adjust axis limits with padding
-                x_min, x_max = self.ax.get_xlim()
-                y_min, y_max = self.ax.get_ylim()
-
-                # Add padding for labels
-                self.ax.set_xlim(x_min, x_max + padding)
-                self.ax.set_ylim(y_min - 0.5, y_max + 0.5)
-
+            # set axis limits with padding
+            x_min, x_max = self.ax.get_xlim()
+            y_min, y_max = self.ax.get_ylim()
+            self.ax.set_xlim(x_min, x_max + padding)
+            self.ax.set_ylim(y_min - 0.5, y_max + 0.5)
         except Exception as e:
-            print(f"Error adjusting tree layout: {e}")
-
+            messagebox.showerror("Error", f"UPGMA failed: {str(e)}")
         # Improve overall figure layout
         self.fig.tight_layout(pad=3.0)  # Add extra padding around the plot
         self.canvas.draw()
