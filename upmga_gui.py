@@ -366,45 +366,12 @@ class UPGMA_GUI:
 
         try:
             with open(file_path, 'w') as f:
-                # Save input data
-                if self.input_method.get() == 0:
-                    f.write("=== INPUT SEQUENCES ===\n\n")
-                    f.write(self.seq_text.get("1.0", tk.END))
-                else:
-                    f.write("=== DISTANCE MATRIX ===\n\n")
-                    labels = self.matrix_labels.get()
-                    f.write(f"Labels: {labels}\n\n")
-
-                    size = len(self.matrix_entries)
-                    for i in range(size):
-                        row = []
-                        for j in range(size):
-                            row.append(self.matrix_entries[i][j].get())
-                        f.write("\t".join(row) + "\n")
-
                 # Save results
-                f.write("\n\n=== UPGMA RESULTS ===\n\n")
-                f.write(f"Newick Format: {self.newick_var.get()}\n")
+                f.write(f"{self.newick_var.get()}")
 
             messagebox.showinfo("Success", f"Results saved to:\n{file_path}")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save file:\n{str(e)}")
-
-# Test UPGMATreeBuilder
-def test_upgma():
-    dist_matrix = np.array([
-        [0, 2, 4],
-        [2, 0, 4],
-        [4, 4, 0]
-    ])
-    labels = ['A', 'B', 'C']
-    tree = UPGMATreeBuilder.upgma(dist_matrix, labels)
-    newick = UPGMATreeBuilder.tree_to_newick(tree)
-    print("Newick:", newick)
-    assert 'A' in newick and 'B' in newick and 'C' in newick
-
-# if __name__ == "__main__":
-#     test_upgma()
 
 if __name__ == "__main__":
     root = tk.Tk()
