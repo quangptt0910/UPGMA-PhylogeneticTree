@@ -324,21 +324,26 @@ class UPGMA_GUI:
         self.ax.clear()
         self.ax.set_title("Phylogenetic Tree Visualization", fontsize=12)
 
-        # First, layout the tree to calculate coordinates
-        tree.ladderize()  # Improve tree layout
+        tree.ladderize()
 
-        # Draw tree using Bio.Phylo
+        # Draw tree
         Phylo.draw(
             tree,
             axes=self.ax,
             branch_labels=lambda c: f"{c.branch_length:.4f}"
-                if c.branch_length is not None
-                   and c.branch_length > 0
-                    and not c.is_terminal()
+                if c.branch_length is not None and c.branch_length > 0
+                    # and not c.is_terminal()
                 else "",
             label_func=lambda c: c.name if c.name else "",
             do_show=False
         )
+
+        # Move branch labels upward
+        for text in self.ax.texts:
+            if text.get_text().replace('.', '', 1).isdigit():
+                x, y = text.get_position()
+                text.set_position((x, y - 0.05))  # adjust Y offset here
+                text.set_fontsize(7)
 
         try:
             # Calc padding
